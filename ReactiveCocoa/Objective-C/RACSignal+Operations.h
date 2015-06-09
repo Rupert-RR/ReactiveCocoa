@@ -42,6 +42,9 @@ extern const NSInteger RACSignalErrorNoMatchingCase;
 /// into the signal.
 - (RACSignal *)doCompleted:(void (^)(void))block;
 
+/// Do the given block on `disposed`. This should be used to inject side effects
+/// into the signal.
+- (RACSignal *)doDisposed:(void (^)(void))block;
 /// Sends `next`s only if we don't receive another `next` in `interval` seconds.
 ///
 /// If a `next` is received, and then another `next` is received before
