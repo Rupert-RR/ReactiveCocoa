@@ -130,25 +130,6 @@ static RACDisposable *subscribeForever (RACSignal *signal, void (^next)(id), voi
 	}] setNameWithFormat:@"[%@] -doCompleted:", self.name];
 }
 
-- (RACSignal *)doDisposed:(void (^)(void))block {
-	NSCParameterAssert(block != NULL);
-	
-	return [[RACSignal createSignal:^(id<RACSubscriber> subscriber) {
-		RACDisposable *disposable = [self subscribeNext:^(id x) {
-			[subscriber sendNext:x];
-		} error:^(NSError *error) {
-			[subscriber sendError:error];
-		} completed:^{
-			block();
-			[subscriber sendCompleted];
-		}];
-		return [RACCompoundDisposable compoundDisposableWithDisposables:@[
-																		   disposable,
-																		   [RACDisposable disposableWithBlock:block]
-																		  ]];
-	}] setNameWithFormat:@"[%@] -doDisposed:", self.name];
-}
-
 - (RACSignal *)throttle:(NSTimeInterval)interval {
 	return [[self throttle:interval valuesPassingTest:^(id _) {
 		return YES;
