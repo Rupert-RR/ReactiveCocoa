@@ -73,6 +73,20 @@ class PropertySpec: QuickSpec {
 				mutableProperty = nil
 				expect(signalCompleted).to(beTruthy())
 			}
+
+			it("should not deadlock on recursive value access") {
+				let (producer, sink) = SignalProducer<Int, NoError>.buffer()
+				var property = MutableProperty(0)
+				var value: Int?
+
+				property <~ producer
+				property.producer.start(next: { _ in
+					value = property.value
+				})
+
+				sendNext(sink, 10)
+				expect(value).to(equal(10))
+			}
 		}
 
 		describe("PropertyOf") {
@@ -247,11 +261,10 @@ class PropertySpec: QuickSpec {
 					let signalProducer = SignalProducer<String, NoError>(values: signalValues)
 
 					let mutableProperty = MutableProperty(initialPropertyValue)
-
 					let disposable = mutableProperty <~ signalProducer
 
 					disposable.dispose()
-					// TODO: Assert binding was teared-down?
+					// TODO: Assert binding was torn down?
 				}
 
 				it("should tear down the binding when bound signal is completed") {
@@ -259,12 +272,10 @@ class PropertySpec: QuickSpec {
 					let (signalProducer, observer) = SignalProducer<String, NoError>.buffer(1)
 					
 					let mutableProperty = MutableProperty(initialPropertyValue)
-					
-					let disposable = mutableProperty <~ signalProducer
-					
-					expect(disposable.disposed).to(beFalsy())
+					mutableProperty <~ signalProducer
+
 					sendCompleted(observer)
-					expect(disposable.disposed).to(beTruthy())
+					// TODO: Assert binding was torn down?
 				}
 
 				it("should tear down the binding when the property deallocates") {
@@ -272,7 +283,6 @@ class PropertySpec: QuickSpec {
 					let signalProducer = SignalProducer<String, NoError>(values: signalValues)
 
 					var mutableProperty: MutableProperty<String>? = MutableProperty(initialPropertyValue)
-
 					let disposable = mutableProperty! <~ signalProducer
 
 					mutableProperty = nil
@@ -298,7 +308,7 @@ class PropertySpec: QuickSpec {
 
 					destinationProperty <~ sourceProperty.producer
 
-					destinationProperty.value = subsequentPropertyValue
+					sourceProperty.value = subsequentPropertyValue
 					expect(destinationProperty.value).to(equal(subsequentPropertyValue))
 				}
 
@@ -319,21 +329,17 @@ class PropertySpec: QuickSpec {
 					var sourceProperty: MutableProperty<String>? = MutableProperty(initialPropertyValue)
 
 					let destinationProperty = MutableProperty("")
-
-					let bindingDisposable = destinationProperty <~ sourceProperty!.producer
+					destinationProperty <~ sourceProperty!.producer
 
 					sourceProperty = nil
-
-					expect(bindingDisposable.disposed).to(beTruthy())
+					// TODO: Assert binding was torn down?
 				}
 
 				it("should tear down the binding when the destination property deallocates") {
 					let sourceProperty = MutableProperty(initialPropertyValue)
-
 					var destinationProperty: MutableProperty<String>? = MutableProperty("")
 
 					let bindingDisposable = destinationProperty! <~ sourceProperty.producer
-
 					destinationProperty = nil
 
 					expect(bindingDisposable.disposed).to(beTruthy())

@@ -33,8 +33,15 @@ class SignalProducerSpec: QuickSpec {
 
 			it("should release signal observers when given disposable is disposed") {
 				var disposable: Disposable!
-				let producer = SignalProducer<Int, NoError> { _, innerDisposable in
+
+				let producer = SignalProducer<Int, NoError> { observer, innerDisposable in
 					disposable = innerDisposable
+
+					innerDisposable.addDisposable {
+						// This is necessary to keep the observer long enough to
+						// even test the memory management.
+						sendNext(observer, 0)
+					}
 				}
 
 				weak var testSink: TestSink?
@@ -1044,6 +1051,15 @@ class SignalProducerSpec: QuickSpec {
 
 					expect(completed).to(beTruthy())
 				}
+
+				it("should not deadlock") {
+					let result = SignalProducer<Int, NoError>(value: 1)
+						|> flatMap(.Latest) { _ in SignalProducer(value: 10) }
+						|> take(1)
+						|> last
+
+					expect(result?.value).to(equal(10))
+				}
 			}
 
 			describe("interruption") {
@@ -1428,6 +1444,27 @@ class SignalProducerSpec: QuickSpec {
 			it("should return an error if one occurs") {
 				let result = SignalProducer<Int, TestError>(error: .Default) |> wait
 				expect(result.error).to(equal(TestError.Default))
+			}
+		}
+
+		describe("observeOn") {
+			it("should immediately cancel upstream producer's work when disposed") {
+				var upstreamDisposable: Disposable!
+				let producer = SignalProducer<(), NoError>{ _, innerDisposable in
+					upstreamDisposable = innerDisposable
+				}
+
+				var downstreamDisposable: Disposable!
+				producer
+					|> observeOn(TestScheduler())
+					|> startWithSignal { signal, innerDisposable in
+						downstreamDisposable = innerDisposable
+					}
+				
+				expect(upstreamDisposable.disposed).to(beFalsy())
+				
+				downstreamDisposable.dispose()
+				expect(upstreamDisposable.disposed).to(beTruthy())
 			}
 		}
 	}
